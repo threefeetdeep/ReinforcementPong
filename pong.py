@@ -1,3 +1,5 @@
+# This version is human vs CPU only
+
 import pygame
 from enum import Enum
 import random
@@ -15,23 +17,25 @@ BLUE = (0, 0, 200)          # P2 paddle (traditional cpu opponent) on right
 BLACK = (0,0,0)             # background
 
 # other game constants
-FRAME_RATE = 20  # frame rate FRAME_RATE - higher is faster, recommend 40 or higher for training, 5 for human game!
-GOALS_AT_GAME_END = 10  # how may goals does the leading player need to score to win?
-BALL_RESTART_POSITION = 0.8  # how many screen widths away from the receiving player does the ball restart after a game (fair values 0.7-0.9)
-PADDLE_X_MARGIN = 10 # how for paddle centre is set in from the edge
+FRAME_RATE = 30 # frame rate FRAME_RATE - higher is faster, recommend 40 or higher for training, 5 for human game!
+GOALS_AT_GAME_END = 10  # the game finishes after this many total goals
+NO_GOAL_FRAME_COUNT_TIMEOUT = 1000  # if no goals have been scored within this frame count, reset the ball with no goal being award to either side
+BALL_RESTART_POSITION = 0.85  # how many screen widths away from the receiving player does the ball restart after a game (fair values 0.7-0.9)
+PADDLE_X_MARGIN = 8 # how for paddle centre is set in from the edge
 BALL_SIZE = 10
 MAX_BALL_START_ANGLE = 30 # degrees from horizontal
-SPIN_INTERCEPT = 15 # spin angle = slope * ball angle +/- intercept
-SPIN_SLOPE = SPIN_INTERCEPT/90  # spin angle  = slope * ball angle +/- intercept
+MAX_SPIN = 50 # maximum spin when ball hits bat at shallow angle. Reduces with ball angle.
 MAX_BALL_ANGLE = 60 # otherwise ball takes ages to bounce across pitch many times!
-MIN_BALL_ANGLE = 10 # otherwise players don't have to move paddle very much!
-PADDLE_INITIAL_SIZE = 80 # how long is the paddle at the start of the game
+MIN_BALL_ANGLE = 15 # otherwise players don't have to move paddle very much!
+PADDLE_INITIAL_SIZE = 60 # how long is the paddle at the start of the game
 PADDLE_END_SIZE = 20  # how short will the paddle shrink to as the game progresses?
 PADDLE_THICKNESS = 8 # paddle thickness
-PADDLE_FRAME_STEP = 20 # pixel speed of paddle motion up/down per frame
-PADDLE_SHRINKAGE = 3 # paddle shrinkage in pixels each time a goal is scored
+PADDLE_SPEED = 22 # paddle y pixel speed step of paddle motion up/down per frame
+P2_SPEED_PENALTY = 8 # paddle y pixel speed penalty for traditional cpu player 
+P2_DEAD_ZONE = 15 # if the ball y is +/- this many pixel of P2's paddle, P2 won't move
+PADDLE_SHRINKAGE = 0 # paddle shrinkage in pixels each time a goal is scored
 INITIAL_BALL_SPEED = 15 # pixels per game step. 
-BALL_SPEED_INC_PCT = 2 # percentage ball FRAME_RATE increase each goal (sensible range 1-3)
+BALL_SPEED_INC_PCT = 1 # percentage ball FRAME_RATE increase each goal (sensible range 1-3)
 SCREEN_HEIGHT = 480
 SCREEN_WIDTH = 640
 
@@ -113,32 +117,47 @@ class Ball:
 
         # useful sign and clamp functions for handling ball angle
         sign = lambda x: copysign(1, x)
-        clamp = lambda n, minn, maxn: max(min(maxn, n), minn)
+
+        def clamp(x, minx,maxx):
+            # clamp x: 
+            # if x<0, -maxx <= x <= -minx
+            # if x>=0, minx <= x <= maxx
+            if sign(x) == 1:
+                # positive
+                return max(min(maxx, x), minx)
+            else:
+                # negative
+                return max(min(-minx,x),-maxx)
+
 
         # handle paddle collision & add some "spin" ie. angle change with paddle motion
         if self.check_paddle_collision(self.game.P1) is True:      
             # add spin
             if self.game.direction == Direction.DOWN:
-                spin = SPIN_SLOPE * self.bv.angle + sign(self.bv.angle)*SPIN_INTERCEPT
+                spin = -MAX_SPIN/(abs(self.bv.angle)**0.5 + 1) * sign(self.bv.angle)
             elif self.game.direction == Direction.UP:
-                spin = SPIN_SLOPE * self.bv.angle + sign(self.bv.angle)*SPIN_INTERCEPT
+                spin = MAX_SPIN/(abs(self.bv.angle)**0.5 + 1) * sign(self.bv.angle)
             else:
                 spin = 0
             #P1 is on left - change sign of ball angle, and direction
-            if self.direction == Direction.LEFT:
-                self.direction = Direction.RIGHT
-                self.bv.x2 = 2*PADDLE_X_MARGIN - self.bv.x2
-            self.bv.angle =  clamp(self.bv.angle + spin, MIN_BALL_ANGLE, MAX_BALL_ANGLE)
+            self.direction = Direction.RIGHT
+            self.bv.x2 = 2*PADDLE_X_MARGIN - self.bv.x2
 
+            print("angle0:", self.bv.angle)
+            self.bv.angle =  clamp(self.bv.angle + spin, MIN_BALL_ANGLE, MAX_BALL_ANGLE)
+            print("spin:  ",spin)
+            print("angle1:",(self.bv.angle))
+            print()
 
         if self.check_paddle_collision(self.game.P2) is True:
             # add spin
-            if self.game.cpu_direction == Direction.DOWN:
-                spin = SPIN_ANGLE_CHANGE
-            elif self.game.cpu_direction == Direction.UP:
-                spin = -SPIN_ANGLE_CHANGE
+            if self.game.direction == Direction.DOWN:
+                spin = MAX_SPIN/(abs(self.bv.angle)**0.5 + 1) * sign(self.bv.angle)
+            elif self.game.direction == Direction.UP:
+                spin = -MAX_SPIN/(abs(self.bv.angle)**0.5 + 1) * sign(self.bv.angle)
             else:
                 spin = 0
+            
             #P2 is on right - change sign of ball angle, and direction
             if self.direction == Direction.RIGHT:
                 self.direction = Direction.LEFT
@@ -163,11 +182,17 @@ class Ball:
         if self.bv.y2 < 0:
             # change sign of angle
             self.bv.angle = -1 * self.bv.angle
+            # for shallow angles, add a bit more to stop "stationary play"
+            if abs(self.bv.angle) < 15:
+                self.bv.angle *= 1.3
             # change y by double the overshoot (i.e. change the sign)
             self.bv.y2 = -1 * self.bv.y2
         if self.bv.y2 > SCREEN_HEIGHT:
             # change sign of angle
             self.bv.angle = -1 * self.bv.angle
+            # for shallow angles, add a bit more to stop "stationary play"
+            if abs(self.bv.angle) < 15:
+                self.bv.angle *= 1.3
             # change y by double the overshoot (i.e. the amount we've exceeded the boundary)
             self.bv.y2 = 2 * SCREEN_HEIGHT - self.bv.y2 
 
@@ -231,14 +256,8 @@ class PongRL:
         self.frame_iteration = 0
 
     # play one frame of the game, accepting action input from the agent if provided
-    def play_step(self, action = None):
-        # REWARD SCHEME:
-        # 0 for a game step with no reward event
-        # -20 for game over 
-        # -10 for losing a point
-        # +10 for winning a point
-        # +20 for winning a game
-
+    def play_step(self):
+     
         # increment frame count
         self.frame_iteration += 1
         game_over = False
@@ -248,21 +267,15 @@ class PongRL:
             if event.type == pygame.QUIT:
                 pygame.quit()
                 quit()
-            if action is None:  # if human controller
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_UP:
-                        self.direction = Direction.UP
-                    elif event.key == pygame.K_DOWN:
-                        self.direction = Direction.DOWN
-                else:
-                    self.direction = Direction.STILL
-            else: # agent controlled (action should be Direction Enum)
-                if action == [1,0]:
+          
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
                     self.direction = Direction.UP
-                elif action == [0,1]:
+                elif event.key == pygame.K_DOWN:
                     self.direction = Direction.DOWN
-                else:
-                    self.direction = Direction.STILL
+            else:
+                self.direction = Direction.STILL
+
 
         # move the paddles (before moving the ball to give the players a chance!)
         self.move_P1_paddle()
@@ -290,22 +303,22 @@ class PongRL:
     def move_P2_paddle(self):
         # track the ball but occassionally make a wrong move
         r = random.randint(0,100)
-        if (r > 25) and (self.ball.bv.y2 > (self.P2.y + 5)):
-            self.P2.y += PADDLE_FRAME_STEP
+        if (r > 40) and (self.ball.bv.y2 > (self.P2.y + 5)):
+            self.P2.y += PADDLE_SPEED
             if self.P2.y > SCREEN_HEIGHT-self.paddle_length/2:
                 self.P2.y = SCREEN_HEIGHT-self.paddle_length/2
-        elif (r > 25) and (self.ball.bv.y2 < (self.P2.y - 5)):
-            self.P2.y -= PADDLE_FRAME_STEP
+        elif (r > 40) and (self.ball.bv.y2 < (self.P2.y - 5)):
+            self.P2.y -= PADDLE_SPEED
             if self.P2.y < self.paddle_length/2:
                 self.P2.y = self.paddle_length/2
-        elif r > 5 and r <= 15:
+        elif r > 30 and r <= 40:
             # move up
-            self.P2.y += PADDLE_FRAME_STEP
+            self.P2.y += PADDLE_SPEED
             if self.P2.y > SCREEN_HEIGHT-self.paddle_length/2:
                 self.P2.y = SCREEN_HEIGHT-self.paddle_length/2
-        elif r > 15 and r <= 25:
+        elif r > 10 and r <= 30:
             # move down
-            self.P2.y -= PADDLE_FRAME_STEP
+            self.P2.y -= PADDLE_SPEED
             if self.P2.y < self.paddle_length/2:
                 self.P2.y = self.paddle_length/2
         else:
@@ -313,14 +326,14 @@ class PongRL:
             pass
 
     
-    # human- or agent-controlled paddle
+    # human-controlled paddle
     def move_P1_paddle(self):
         if self.direction == Direction.DOWN:
-            self.P1.y += PADDLE_FRAME_STEP
+            self.P1.y += PADDLE_SPEED
             if self.P1.y > SCREEN_HEIGHT-self.paddle_length/2:
                 self.P1.y = SCREEN_HEIGHT-self.paddle_length/2
         elif self.direction == Direction.UP:
-            self.P1.y -= PADDLE_FRAME_STEP
+            self.P1.y -= PADDLE_SPEED
             if self.P1.y < self.paddle_length/2:
                 self.P1.y = self.paddle_length/2
 

@@ -22,19 +22,18 @@ BALL_RESTART_POSITION = 0.85  # how many screen widths away from the receiving p
 PADDLE_X_MARGIN = 8 # how for paddle centre is set in from the edge
 BALL_SIZE = 10
 MAX_BALL_START_ANGLE = 30 # degrees from horizontal
-SPIN_INTERCEPT = 17 # spin angle = slope * ball angle +/- intercept
-SPIN_SLOPE = SPIN_INTERCEPT/90  # spin angle  = slope * ball angle +/- intercept
+MAX_SPIN = 50 # maximum spin when ball hits bat at shallow angle. Reduces with ball angle.
 MAX_BALL_ANGLE = 60 # otherwise ball takes ages to bounce across pitch many times!
-MIN_BALL_ANGLE = 10 # otherwise players don't have to move paddle very much!
+MIN_BALL_ANGLE = 15 # otherwise players don't have to move paddle very much!
 PADDLE_INITIAL_SIZE = 60 # how long is the paddle at the start of the game
 PADDLE_END_SIZE = 20  # how short will the paddle shrink to as the game progresses?
 PADDLE_THICKNESS = 8 # paddle thickness
-PADDLE_SPEED = 20 # paddle y pixel speed step of paddle motion up/down per frame
-P2_SPEED_PENALTY = 6 # paddle y pixel speed penalty for traditional cpu player 
-P2_DEAD_ZONE = 6 # if the ball y is +/- this many pixel of P2's paddle, P2 won't move
-PADDLE_SHRINKAGE = 2 # paddle shrinkage in pixels each time a goal is scored
+PADDLE_SPEED = 22 # paddle y pixel speed step of paddle motion up/down per frame
+P2_SPEED_PENALTY = 9 # paddle y pixel speed penalty for traditional cpu player 
+P2_DEAD_ZONE = 16 # if the ball y is +/- this many pixel of P2's paddle, P2 won't move
+PADDLE_SHRINKAGE = 1 # paddle shrinkage in pixels each time a goal is scored
 INITIAL_BALL_SPEED = 15 # pixels per game step. 
-BALL_SPEED_INC_PCT = 2 # percentage ball FRAME_RATE increase each goal (sensible range 1-3)
+BALL_SPEED_INC_PCT = 1 # percentage ball FRAME_RATE increase each goal (sensible range 1-3)
 SCREEN_HEIGHT = 480
 SCREEN_WIDTH = 640
 
@@ -66,6 +65,7 @@ class Point():
 class Ball:
     def __init__(self,game):
         self.game = game
+
         # set intial ball speed
         self.bv = Vector(0, 0,0,0, INITIAL_BALL_SPEED, 0) 
         # set location,angle and direction
@@ -74,8 +74,7 @@ class Ball:
     # reset ball location after goal (speed same, angle randomly set, direction random)
     def reset(self):
         # initial direction of ball is left or right (WARNING: Goals can be scored without agent 'trying')
-        # if random.randint(0,1):
-        if 1 == 0:  # better for ball to come toward agent at each restart after a goal... (so agent has to "earn" a goal)
+        if random.randint(0,1): 
             self.ball_direction = Direction.RIGHT
             self.previous_direction = Direction.RIGHT
             mult = 1
@@ -96,7 +95,10 @@ class Ball:
             initial_angle = random.randint(-MAX_BALL_START_ANGLE, MAX_BALL_START_ANGLE)
         self.bv.angle = initial_angle
 
-        
+    # return the sign of the ball angle (for agent state)
+    def get_angle_sign(self):
+        sign = lambda x: copysign(1, x)
+        return sign(self.bv.angle)   
         
     # move the ball according to its angle and speed
     def move(self):
@@ -120,15 +122,25 @@ class Ball:
 
         # useful sign and clamp functions for handling ball angle
         sign = lambda x: copysign(1, x)
-        clamp = lambda n, minn, maxn: max(min(maxn, n), minn)
+
+        def clamp(x, minx,maxx):
+                # clamp x: 
+            # if x<0, -maxx <= x <= -minx
+            # if x>=0, minx <= x <= maxx
+            if sign(x) == 1:
+                # positive
+                return max(min(maxx, x), minx)
+            else:
+                # negative
+                return max(min(-minx,x),-maxx)
 
         # handle paddle collision & add some "spin" ie. angle change with paddle motion
         if self.check_paddle_collision(self.game.P1) is True:      
             # add spin
             if self.game.agent_direction == Direction.DOWN:
-                spin = SPIN_SLOPE * self.bv.angle + sign(self.bv.angle)*SPIN_INTERCEPT
+                spin = -MAX_SPIN/(abs(self.bv.angle)**0.5 + 1) * sign(self.bv.angle)
             elif self.game.agent_direction == Direction.UP:
-                spin = -(SPIN_SLOPE * self.bv.angle + sign(self.bv.angle)*SPIN_INTERCEPT)
+                spin = MAX_SPIN/(abs(self.bv.angle)**0.5 + 1) * sign(self.bv.angle)
             else:
                 spin = 0
             #P1 is on left - change sign of ball angle, and direction
@@ -141,9 +153,9 @@ class Ball:
         if self.check_paddle_collision(self.game.P2) is True:
             # add spin
             if self.game.cpu_direction == Direction.DOWN:
-                spin = SPIN_SLOPE * self.bv.angle + sign(self.bv.angle)*SPIN_INTERCEPT
+                spin = -MAX_SPIN/(abs(self.bv.angle)**0.5 + 1) * sign(self.bv.angle)
             elif self.game.cpu_direction == Direction.UP:
-                spin = -(SPIN_SLOPE * self.bv.angle + sign(self.bv.angle)*SPIN_INTERCEPT)
+                spin = MAX_SPIN/(abs(self.bv.angle)**0.5 + 1) * sign(self.bv.angle)
             else:
                 spin = 0
             #P2 is on right - change sign of ball angle, and direction
@@ -197,10 +209,10 @@ class Ball:
 
 
 class PongRL:    
-    def __init__(self, w=SCREEN_WIDTH, h=SCREEN_HEIGHT):
+    def __init__(self):
         # screen size
-        self.w = w
-        self.h = h
+        self.w = SCREEN_WIDTH
+        self.h = SCREEN_HEIGHT
 
         # current user paddle direction
         self.agent_direction = Direction.STILL
@@ -273,12 +285,12 @@ class PongRL:
                 self.frame_rate = clamp(self.frame_rate,20,MAX_FRAME_RATE)
 
         # agent controlled (action should be Direction Enum)
-        if action == [1,0,0]:
+        if action == [1,0]:
             self.agent_direction = Direction.UP
-        elif action == [0,1,0]:
+        elif action == [0,1]:
             self.agent_direction = Direction.DOWN
-        else:
-            self.agent_direction = Direction.STILL
+        #else:
+           #self.agent_direction = Direction.STILL
 
         # move the paddles (before moving the ball to give the players a chance!)
         self.move_P1_paddle()
@@ -294,7 +306,7 @@ class PongRL:
 
         # if ball direction has changed from LEFT to RIGHT, agent must have hit is, so give reward
         if (self.ball.ball_direction != self.ball.previous_direction) and self.ball.ball_direction == Direction.RIGHT:
-            reward = 0
+            reward = 1
             self.ball.previous_direction = self.ball.ball_direction
 
         # if a goal was scored, reset
@@ -329,7 +341,7 @@ class PongRL:
             if self.score[0] > self.score[1]:
                 reward = 20
             else:
-                reward = 0
+                reward = -20
 
         return reward, game_over, self.score
 
@@ -411,16 +423,16 @@ class PongRL:
 
         pygame.display.flip()
 
-# if __name__ == '__main__':
-#     game = PongRL()
+if __name__ == '__main__':
+    game = PongRL()
     
-#     # game loop
-#     while True:
-#         game_over, score = game.play_step()
-#         if game_over == True:
-#             break
-#         if  (score[0]+score[1]) >= GOALS_AT_GAME_END:
-#             break
+    # game loop
+    while True:
+        game_over, score = game.play_step()
+        if game_over == True:
+            break
+        if  (score[0]+score[1]) >= GOALS_AT_GAME_END:
+            break
         
-#     print('Final Score', score)       
-#     pygame.quit() 
+    print('Final Score', score)       
+    pygame.quit() 

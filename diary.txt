@@ -61,5 +61,9 @@ direction of ball
 1 toward agent (P1)
 
 so example states
-[0,0]   ball on same y as paddle, but mving away
+[0,0]   ball on same y as paddle, but moving away
 [-1,1]  ball below paddle and moving towards paddle
+
+
+06/03/2021
+Now to convert to Keras to give more direct experience of defining and running the neural network:

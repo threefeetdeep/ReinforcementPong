@@ -16,7 +16,10 @@ class Linear_QNet(nn.Module):
     def forward(self,x):  # overrides nn.Module forward(self,x)
         # forward propagation
         x = F.relu(self.linear1(x))  # input layer with RELU
+        #x = F.sigmoid(self.linear1(x))  # input layer with sigmoid activation
+
         x = self.linear2(x)     # raw linear output; we'll take max as move action
+        #x = F.sigmoid(self.linear2(x))     # output layer with sigmoid activation
         return x
 
     def save(self, file_name='model.pth'):
@@ -35,9 +38,9 @@ class QTrainer:
         self.lr = lr
         self.gamma = gamma
         self.model = model
-        self.optimizer = optim.Adam(model.parameters(), lr=self.lr)
+        # add in regularization to reduce overfitting (weight_decay)
+        self.optimizer = optim.Adam(model.parameters(), lr=self.lr, weight_decay=0.001)
         self.criterion = nn.MSELoss()
-      
 
     def train_step(self, state, action, reward, next_state, done):
         # inputs can be single values (train_short) or list of tuples (train_long)
@@ -77,7 +80,6 @@ class QTrainer:
                 # updated estimate for this step
                 Q_new = Q_new + self.gamma * torch.max(self.model(next_state[idx]))
 
-
             # NOTE:
             # Q_new = reward[idx] + self.gamma * torch.max(self.model(next_state[idx]))
             #   |           |             |           |                     |
@@ -93,8 +95,6 @@ class QTrainer:
             # based on the reward estimate update above
             target[idx][torch.argmax(action).item()] = Q_new
 
-
-
         
         # reset to zero the gradient optimizer before backprop
         self.optimizer.zero_grad() 
@@ -102,6 +102,10 @@ class QTrainer:
         # the MSE loss between target and predicted, which we want to minimize
         # by tweaking the NN weights via backprop
         self.loss = self.criterion(target, pred)
+
+        # after each game's retraining:
+        if (len(done) > 1):
+            print("Loss: " + str(self.loss))
 
         # do the back propogation step
         self.loss.backward() 
