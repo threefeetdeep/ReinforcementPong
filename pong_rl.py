@@ -137,9 +137,9 @@ class Ball:
         # handle paddle collision & add some "spin" ie. angle change with paddle motion
         if self.check_paddle_collision(self.game.P1) is True:      
             # add spin
-            if self.game.agent_direction == Direction.DOWN:
+            if self.game.p1_direction == Direction.DOWN:
                 spin = -MAX_SPIN/(abs(self.bv.angle)**0.5 + 1) * sign(self.bv.angle)
-            elif self.game.agent_direction == Direction.UP:
+            elif self.game.p1_direction == Direction.UP:
                 spin = MAX_SPIN/(abs(self.bv.angle)**0.5 + 1) * sign(self.bv.angle)
             else:
                 spin = 0
@@ -209,13 +209,13 @@ class Ball:
 
 
 class PongRL:    
-    def __init__(self):
+    def __init__(self, frame_rate=MAX_FRAME_RATE):
         # screen size
         self.w = SCREEN_WIDTH
         self.h = SCREEN_HEIGHT
 
         # current user paddle direction
-        self.agent_direction = Direction.STILL
+        self.p1_direction = Direction.STILL
 
         # current CPU paddle direction
         self.cpu_direction = Direction.STILL
@@ -225,7 +225,7 @@ class PongRL:
         pygame.display.set_caption('Pong')
         self.goal = False
         self.clock = pygame.time.Clock()
-        self.frame_rate = MAX_FRAME_RATE
+        self.frame_rate = frame_rate
 
         #reset can also be under agent control between each training game
         self.reset()
@@ -254,7 +254,7 @@ class PongRL:
 
         # initialize P1 & P2 direction variables
         self.cpu_direction = Direction.STILL
-        self.agent_direction = Direction.STILL
+        self.p1_direction = Direction.STILL
 
     # play one frame of the game, accepting action input from the agent if provided
     def play_step(self, action = None):
@@ -277,7 +277,18 @@ class PongRL:
             if event.type == pygame.QUIT:
                 pygame.quit()
                 quit()
-            if event.type == pygame.KEYDOWN:
+
+            self.p1_direction = Direction.STILL     
+            # human paddle control input: up / down arrow
+            if event.type == pygame.KEYDOWN and action == None:
+                if event.key == pygame.K_UP:
+                    self.p1_direction = Direction.UP
+                elif event.key == pygame.K_DOWN:
+                    self.p1_direction = Direction.DOWN
+
+                    
+            # change frame rate: (left / right arrow keys)
+            if event.type == pygame.KEYDOWN: 
                 if event.key == pygame.K_LEFT:
                     self.frame_rate -= 20
                 elif event.key == pygame.K_RIGHT:
@@ -285,12 +296,11 @@ class PongRL:
                 self.frame_rate = clamp(self.frame_rate,20,MAX_FRAME_RATE)
 
         # agent controlled (action should be Direction Enum)
-        if action == [1,0]:
-            self.agent_direction = Direction.UP
-        elif action == [0,1]:
-            self.agent_direction = Direction.DOWN
-        #else:
-           #self.agent_direction = Direction.STILL
+        if action != None:
+            if action == [1,0]:
+                self.p1_direction = Direction.UP
+            elif action == [0,1]:
+                self.p1_direction = Direction.DOWN
 
         # move the paddles (before moving the ball to give the players a chance!)
         self.move_P1_paddle()
@@ -384,11 +394,11 @@ class PongRL:
     
     # human- or agent-controlled paddle
     def move_P1_paddle(self):
-        if self.agent_direction == Direction.DOWN:
+        if self.p1_direction == Direction.DOWN:
             self.P1.y += PADDLE_SPEED
             if self.P1.y > SCREEN_HEIGHT-self.paddle_length/2:
                 self.P1.y = SCREEN_HEIGHT-self.paddle_length/2
-        elif self.agent_direction == Direction.UP:
+        elif self.p1_direction == Direction.UP:
             self.P1.y -= PADDLE_SPEED
             if self.P1.y < self.paddle_length/2:
                 self.P1.y = self.paddle_length/2
@@ -423,16 +433,3 @@ class PongRL:
 
         pygame.display.flip()
 
-if __name__ == '__main__':
-    game = PongRL()
-    
-    # game loop
-    while True:
-        game_over, score = game.play_step()
-        if game_over == True:
-            break
-        if  (score[0]+score[1]) >= GOALS_AT_GAME_END:
-            break
-        
-    print('Final Score', score)       
-    pygame.quit() 

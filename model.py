@@ -19,6 +19,7 @@ class Linear_QNet(nn.Module):
         x = self.linear2(x)     # raw linear output; we'll take max as move action
         return x
 
+    # save the model after each game and when training is complete
     def save(self, file_name='model.pth'):
         model_folder_path = './model'
         if not os.path.exists(model_folder_path):
@@ -27,6 +28,14 @@ class Linear_QNet(nn.Module):
         file_name = os.path.join(model_folder_path, file_name)
         # save the model state dictionary 
         torch.save(self.state_dict(), file_name)
+        print("Saving Model...")
+
+    # load an existing pre-trained model if you want to skip the learning phase
+    def load(self, file_name='model.pth'):
+        model_folder_path = './model'
+        file_name = os.path.join(model_folder_path, file_name)
+        self.load_state_dict(torch.load(file_name))
+        print("Model loaded...")
         
 
 # The Trainer: is passed the model 
@@ -87,7 +96,7 @@ class QTrainer:
             # see Sutton p131 eqn(6.8) "Bellman Equation" Q-Learning algorithm
             # New Q(s,a) = Q(s,a) + alpha[R(s,a) + lr.maxQ'(s',a') - Q(s,a)]
             #    |           |         |                  |             |
-            #  Q_new       Q_new     slef.gamma*       ANN prediction on next state
+            #  Q_new       Q_new     self.gamma*       ANN prediction on next state
 
             # Set the optimal action in the clone of action predictions
             # based on the reward estimate update above

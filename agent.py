@@ -137,13 +137,21 @@ class Agent:
 
 
 # global train function
-def train():
+def train(training_phase=True):
     total_score = 0
     record = 0
     agent = Agent()
-    game = PongRL()
+    
     mse_loss = 999 # default crazy high value
-    training_phase = True  # set to False on neural network loss is low
+
+    if (training_phase == False):
+        # load model, skip learning phase
+        agent.model.load()
+        # game running at human-viewable 30FPS.
+        game = PongRL(frame_rate=30)
+    else:
+        # game running at max frame rate for faster trainin
+        game = PongRL()
 
     # Agent training loop
     while True:
@@ -185,11 +193,15 @@ def train():
         # summarise game results
             total_score += score[0]
             mean_score = total_score / agent.n_games
-            mse_loss = agent.trainer.loss
+            
 
             print('Game,' + str(agent.n_games) +  '; Score:' +  str(score[0]) +
-               '; Record:' + str(record) + '; Mean Score:' + str(mean_score) +
-               '; MSE Loss:' + str(mse_loss.item()))
+               '; Record:' + str(record) + '; Mean Score:' + str(mean_score))
+            
+            if (training_phase == True):
+                mse_loss = agent.trainer.loss
+                print('MSE Loss:' + str(mse_loss.item()))
+                print()
 
 
 # run with 'python3 agent.py'
