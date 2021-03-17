@@ -1,16 +1,19 @@
 # ReinforcementPong
-My introduction to Reinforcememt Learning: a simple pong game with RL agent. Written in Python3, you wil need the following Python modules:
+My introduction to Reinforcement Learning: a simple pong game with RL agent. Written in Python3, you wil need the following Python modules:
 
 * torch
 * pygame
 
+My agent and model code draws heavily on the excellent YouTube 'Reinforcement Snake' video series by [Python Engineer](https://www.youtube.com/watch?v=PJl4iabBEz0)
+
 ![alt pong!](https://github.com/threefeetdeep/ReinforcementPong/blob/master/images/pong1.png?raw=true)
 
 ## The Game 
-Player1 has the red paddle, and is on the left side of the Pong 'court'
-Player2 has the blue paddle, and is on the right side.
-A goal is scored if the ball makes it past a paddle.
-A game is ended when a total of ten games have been scored. (e.g. final scores 5-5, 2-8, 9-1 etc.)
+
+- Player1 has the red paddle, and is on the left side of the Pong 'court'
+- Player2 has the blue paddle, and is on the right side.
+- A goal is scored if the ball makes it past a paddle.
+- A game is ended when a total of ten games have been scored. (e.g. final scores 5-5, 2-8, 9-1 etc.)
 
 ## Instructions
 Pong can be run in three ways:
@@ -46,5 +49,7 @@ Some of thie thing that would be good to add to the game:
 * Use regularizatio to prevent overfitting
 * Add an automatic stop to training once the agent has won X games against the CPU Player2.
 
+The screenshot below is from the agent training phase, showing the mena score after each game, as well as
+the current MSE loss of the model state-action neural network.
 ![alt pong!](https://github.com/threefeetdeep/ReinforcementPong/blob/master/images/pong2.png?raw=true)
 
