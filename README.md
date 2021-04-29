@@ -43,7 +43,7 @@ experienced, and do odd things like sitting at the top or bottom of the screen. 
 this, but it is not in general the best behaviour. 
 
 ## Future Improvements
-Some of thie thing that would be good to add to the game:
+It would be good to add to the game:
 
 * Abililty to change the state-action model (e.g. from neural network to SVM or decision tree) before training the agent
 * Use regularizatio to prevent overfitting
