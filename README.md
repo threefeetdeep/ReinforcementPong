@@ -49,7 +49,7 @@ Some of thie thing that would be good to add to the game:
 * Use regularizatio to prevent overfitting
 * Add an automatic stop to training once the agent has won X games against the CPU Player2.
 
-The screenshot below is from the agent training phase, showing the mena score after each game, as well as
+The screenshot below is from the agent training phase, showing the mean score after each game, as well as
 the current MSE loss of the model state-action neural network.
 ![alt pong!](https://github.com/threefeetdeep/ReinforcementPong/blob/master/images/pong2.png?raw=true)
 
